@@ -32,15 +32,6 @@ token = get_token(login, pwd)
 allofem = ' '
 exercisea = ' '
 
-#pyppeter PNG GENERATOR
-async def mainofpng():
-    browsera = await launch()
-    pagech = await browsera.newPage()
-    await pagech.goto("data:text/html;charset=utf-8," + allofem, {'waitUntil':'networkidle0'})
-    global screenshot_of_exercise
-    screenshot_of_exercise = await pagech.screenshot({'path': 'dziala.png', 'fullPage': 'true'})
-    await browsera.close()
-
 #ODRABIAMY DOWNLOAD
 def down_page():
     rget = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{page}/{bookid}', headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {token}'}).content.decode('utf-8')
