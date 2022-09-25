@@ -1,8 +1,6 @@
-import os, click, requests, json, inspect, os.path, getpass, discord, asyncio, PIL
-from bs4 import BeautifulSoup
+import requests, json, asyncio
 from pyppeteer import launch
 from io import BytesIO
-from PIL import Image
 from telegram.ext.updater import Updater
 from telegram.update import Update
 from telegram.ext.callbackcontext import CallbackContext
