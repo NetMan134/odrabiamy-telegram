@@ -1,23 +1,20 @@
 import requests, json, asyncio
 from pyppeteer import launch
 from io import BytesIO
+from os import getenv
 from telegram.ext.updater import Updater
 from telegram.update import Update
 from telegram.ext.callbackcontext import CallbackContext
 from telegram.ext.commandhandler import CommandHandler
-from telegram.ext.messagehandler import MessageHandler
-from telegram.ext.filters import Filters
 
 
 #ODRABIAMY MANAGEMENT
 
 
-login = 'LOGIN DO ODRABIAMY'
-pwd = 'HASLO DO ODRABIAMY'
+login = getenv('ODRABIAMY_LOGIN')
+pwd = getenv('ODRABIAMY_PASS')
 
-updater = Updater(
-    "TOKEN DO BOTA TELEGRAM"
-    ,use_context=True)
+updater = Updater(getenv('TELEGRAM_BOT_TOKEN'), use_context=True)
 
 def get_token(user, password):
     try:
@@ -196,20 +193,9 @@ def odrabiamypage(update: Update, context: CallbackContext):
         print('chk2')
         context.bot.send_document(update.effective_chat.id, BytesIO(screenshot_of_exercise),filename=f"sonic_porno_big.png")
 
-def odczytajTest(update: Update, context: CallbackContext):
-    token = get_token(login, pwd)
-    update.message.reply_text('czekaj...' + token)
-
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(CommandHandler('help', help))
-updater.dispatcher.add_handler(CommandHandler('odrabiamy', odczytajTest))
 updater.dispatcher.add_handler(CommandHandler('zadanie', odrabiamy))
 updater.dispatcher.add_handler(CommandHandler('strona', odrabiamypage))
-# updater.dispatcher.add_handler(MessageHandler(Filters.text, odrabiamy))
-updater.dispatcher.add_handler(MessageHandler(
-    # Filters out unknown commands
-    Filters.command, unknown))
-  
-# Filters out unknown messages.
-# updater.dispatcher.add_handler(MessageHandler(Filters.text, unknown_text))
+
 updater.start_polling()
