@@ -8,13 +8,13 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.ext.commandhandler import CommandHandler
 
 
-#ODRABIAMY MANAGEMENT
-
+# ODRABIAMY MANAGEMENT
 
 login = getenv('ODRABIAMY_LOGIN')
 pwd = getenv('ODRABIAMY_PASS')
 
 updater = Updater(getenv('TELEGRAM_BOT_TOKEN'), use_context=True)
+
 
 def get_token(user, password):
     try:
@@ -24,15 +24,12 @@ def get_token(user, password):
     except:
         return False
 
+
 token = get_token(login, pwd)
-# token = get_token(login, pwd)
-# bookid = input('daj id ksiazki: ')
-# page = input('daj strone: ')
 
 allofem = ' '
-# exercisea = ' '
 
-#ODRABIAMY DOWNLOAD
+# ODRABIAMY DOWNLOAD
 def down_page_whole():
     rget = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{page}/{bookid}', headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {token}'}).content.decode('utf-8')
     lists = json.loads(rget).get('data')
@@ -49,6 +46,7 @@ def down_page_whole():
         global allofem
         allofem += "<h1 style=\"font-weight:700;color:#200;\">" + book_name + "<br>Zadanie, id:" + exe_id + "<br>nr: " + numbera + "/" + page + "</h1><br>" + solutiona
 
+
 def down_page():
     rget = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{page}/{bookid}', headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {token}'}).content.decode('utf-8')
     lists = json.loads(rget).get('data')
@@ -59,7 +57,6 @@ def down_page():
         # print(lists[a]['number'])
         print(lists[a]['id'])
         print(exercise['id'])
-        # if exercise['number'] == exercisea:
         if exercise['id'] == exe_id_written:
             print('WPISANE ZADANIE W BOTA ZGADZA SIE')
             # a += 1
@@ -70,7 +67,6 @@ def down_page():
     print(exe_id_written)
     b = 0
     while b <= a:
-        # if lists[b]['number'] == exercisea:
         print(lists[b]['id'])
         if str(lists[b]['id']) == str(exe_id_written):
             numbera = lists[b]['number']
@@ -82,26 +78,20 @@ def down_page():
             print(book_name)
             global allofem
             allofem = "<h1 style=\"font-weight:700;color:#200;\">" + book_name + "<br>Zadanie, id:" + exe_id + "<br>nr: " + numbera + "/" + page + "</h1><br>" + solutiona
-            # if str(usera['id']) == '1101709411':
-            #     allofem += "<br><img src=\"data:image/png," + BytesIO(imagesonic) + "\">"
             break
         else:
             print('czekaj...')
         b += 1
 
-#TELEGRAM BOT MANAGEMENT
-
-
+# TELEGRAM BOT MANAGEMENT
 def start(update: Update, context: CallbackContext):
     update.message.reply_text(
         "seks!")
-    if 'odrabiamy.pl' in update.message.text:
-        update.message.reply_text(
-            "dziala!")
-        urlArgums = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+
 
 def help(update: Update, context: CallbackContext):
     update.message.reply_text("Your Message")
+
 
 def unknown_text(update: Update, context: CallbackContext):
     update.message.reply_text(
@@ -112,21 +102,16 @@ def unknown(update: Update, context: CallbackContext):
     update.message.reply_text(
         "Sorry '%s' is not a valid command" % update.message.text)
 
+
 def odrabiamy(update: Update, context: CallbackContext):
     if 'odrabiamy.pl' in update.message.text:
         urlArgs = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
-        # urlArgsa = update.message.text.split('odrabiamy.pl')[1].split(' ')[1]
-        global bookid, page, exe_id_written, usera # exercisea
+        global bookid, page, exe_id_written, usera
         bookid = urlArgs[2].split('-')[1]
         page = urlArgs[3].split('-')[1]
         exe_id_written = urlArgs[4].split('-')[1]
-        # exercisea = urlArgsa
         update.message.reply_text("bookId:" + bookid + ", page: " + page + ", exerciseId: " + exe_id_written)
         usera = update.message.from_user
-        # if str(usera['id']) == '1101709411':
-        #     print('oskar')
-        #     global imagesonic
-        #     imagesonic = open('sonic.jpg', 'rb').read()
         down_page()
         print('checkpoint\n')
         update.message.reply_text("downloaded successfully, generating image...")
@@ -145,7 +130,6 @@ def odrabiamy(update: Update, context: CallbackContext):
             # screenshot_of_exercise = await pagech.screenshot({'fullPage': 'true'})
             await browsera.close()
 
-        # asyncio.get_event_loop().run_until_complete(mainofpng())
         loopng = asyncio.new_event_loop()
         asyncio.set_event_loop(loopng)
         print('chk1')
@@ -153,22 +137,18 @@ def odrabiamy(update: Update, context: CallbackContext):
         print('chk2')
         context.bot.send_document(update.effective_chat.id, BytesIO(screenshot_of_exercise),filename=f"sonic_porno.png")
 
+
 def odrabiamypage(update: Update, context: CallbackContext):
     if 'odrabiamy.pl' in update.message.text:
         urlArgs = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
-        # urlArgsa = update.message.text.split('odrabiamy.pl')[1].split(' ')[1]
-        global bookid, page, usera # exercisea
+        global bookid, page, usera
         bookid = urlArgs[2].split('-')[1]
         page = urlArgs[3].split('-')[1]
-        # exercisea = urlArgsa
         update.message.reply_text("bookId:" + bookid + ", page: " + page)
         usera = update.message.from_user
-        # if str(usera['id']) == '1101709411':
-        #     print('oskar')
-        #     global imagesonic
-        #     imagesonic = open('sonic.jpg', 'rb').read()
+
         down_page_whole()
-        print('checkpoint\n')
+        print('checkpoint')
         update.message.reply_text("downloaded page successfully, generating image...")
         # print(allofem)
 
@@ -192,6 +172,7 @@ def odrabiamypage(update: Update, context: CallbackContext):
         loopng.run_until_complete(mainofpng())
         print('chk2')
         context.bot.send_document(update.effective_chat.id, BytesIO(screenshot_of_exercise),filename=f"sonic_porno_big.png")
+
 
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(CommandHandler('help', help))
