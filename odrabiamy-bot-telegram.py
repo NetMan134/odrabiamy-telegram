@@ -18,7 +18,7 @@ updater = Updater(getenv('TELEGRAM_BOT_TOKEN'), use_context=True)
 
 def get_token(user, password):
     try:
-        rpost = requests.post(url=('https://odrabiamy.pl/api/v2/sessions'), json=({"login": f"{user}", "password": f"{password}"})).content
+        rpost = requests.post(url='https://odrabiamy.pl/api/v2/sessions', json=({"login": f"{user}", "password": f"{password}"})).content
         token = json.loads(rpost).get('data').get('token')
         return token
     except:
@@ -159,8 +159,7 @@ def odrabiamypage(update: Update, context: CallbackContext):
             pagech = await browsera.newPage()
             await pagech.goto("data:text/html;charset=utf-8," + allofem, {'waitUntil':'networkidle0'})
             global screenshot_of_exercise
-            screenshot_of_exercise = await pagech.screenshot({'path': 'dzialacXD.png', 'fullPage': 'true'})
-            # screenshot_of_exercise = await pagech.screenshot({'fullPage': 'true'})
+            screenshot_of_exercise = await pagech.screenshot({'fullPage': 'true'})
             await browsera.close()
 
         # asyncio.get_event_loop().run_until_complete(mainofpng())
