@@ -59,7 +59,6 @@ def down_page():
         print(exercise['id'])
         if exercise['id'] == exe_id_written:
             print('WPISANE ZADANIE W BOTA ZGADZA SIE')
-            # a += 1
             break
         else:
             print('NIE NIE NIE NIE WPISANE ZADANIE W BOTA NIEZGADZA SIE')
@@ -126,8 +125,7 @@ def odrabiamy(update: Update, context: CallbackContext):
             pagech = await browsera.newPage()
             await pagech.goto("data:text/html;charset=utf-8," + allofem, {'waitUntil':'networkidle0'})
             global screenshot_of_exercise
-            screenshot_of_exercise = await pagech.screenshot({'path': 'dzialacXD.png', 'fullPage': 'true'})
-            # screenshot_of_exercise = await pagech.screenshot({'fullPage': 'true'})
+            screenshot_of_exercise = await pagech.screenshot({'fullPage': 'true'})
             await browsera.close()
 
         loopng = asyncio.new_event_loop()
