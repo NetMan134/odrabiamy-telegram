@@ -8,15 +8,16 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.ext.commandhandler import CommandHandler
 
 
-# ODRABIAMY MANAGEMENT
-
+# odrabiamy - login variables (stored in environment)
 odrabiamyLogin = getenv('ODRABIAMY_LOGIN')
 odrabiamyPass  = getenv('ODRABIAMY_PASS')
 
+# telegram - bot token variables (stored in environment variable)
 updater = Updater(
     getenv('TELEGRAM_BOT_TOKEN'),
 use_context=True)
 
+# odrabiamy - get token
 def getOdrabiamyToken(email, password):
     try:
         requestTokenPost = requests.post(url='https://odrabiamy.pl/api/v2/sessions', json=
@@ -26,12 +27,15 @@ def getOdrabiamyToken(email, password):
     except:
         return False
 
+# odrabiamy - assign token
 token = getOdrabiamyToken(odrabiamyLogin, odrabiamyPass)
+
+# odrabiamy - check login details or premium subscription
 if token == False:
     print('Incorrect login details for odrabiamy.\nOr perhaps you don\'t have premium?')
     quit()
 
-# ODRABIAMY DOWNLOAD
+# odrabiamy - download page
 def downloadPage():
     requestPageGet = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{page}/{bookid}',
         headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {token}'}).content.decode('utf-8')
@@ -46,6 +50,7 @@ def downloadPage():
          + exe_id + "<br>nr: " + number + "/" + page + "</h1><br>" + solution
 
 
+# odrabiamy - download page exercise
 def downloadPageExercise():
     requestPageGet = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{page}/{bookid}',
         headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {token}'}).content.decode('utf-8')
@@ -68,12 +73,13 @@ def downloadPageExercise():
             break
         forExercises += 1
 
-# TELEGRAM BOT MANAGEMENT
+
+# telegram - /start command
 def start(update: Update, context: CallbackContext):
     update.message.reply_text(
         "Witaj, jestem odrabiamy-telegram!\nZerknij na /pomoc lub /help ")
 
-
+# telegram - /help or /pomoc command
 def help(update: Update, context: CallbackContext):
     update.message.reply_text("Pomoc i krótka instrukcja:\n\n/zadanie [URL] \- bot odeśle określone zadanie w pliku PNG, URL musi być w formacie: "\
          + "```https://odrabiamy.pl/nazwa\-przedmiotu/ksiazka\-id/strona\-numer/zadanie\-id```"\
@@ -81,6 +87,7 @@ def help(update: Update, context: CallbackContext):
          + "```https://odrabiamy.pl/nazwa\-przedmiotu/ksiazka\-id/strona\-numer```\nlub tak jak w komendzie /zadanie"
          , parse_mode='MarkdownV2')
 
+# telegram - /exercise or /zadanie command
 def pageExerciseCmd(update: Update, context: CallbackContext):
     if 'odrabiamy.pl' in update.message.text:
         urlArgs = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
@@ -116,6 +123,7 @@ def pageExerciseCmd(update: Update, context: CallbackContext):
         BytesIO(screenshot_of_exercise),filename=f"{book_name}_Strona {page}_Zadanie {number}.png")
 
 
+# telegram - /page or /strona command
 def pageCmd(update: Update, context: CallbackContext):
     if 'odrabiamy.pl' in update.message.text:
         global bookid, page, usera
@@ -151,12 +159,18 @@ def pageCmd(update: Update, context: CallbackContext):
         context.bot.send_document(update.effective_chat.id, BytesIO(screenshot_of_exercise),filename=f"{book_name}_Strona {page}.png")
 
 
+# telegram - handle commands and redirect to functions
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(CommandHandler('help', help))
 updater.dispatcher.add_handler(CommandHandler('pomoc', help))
+updater.dispatcher.add_handler(CommandHandler('exercise', pageExerciseCmd))
 updater.dispatcher.add_handler(CommandHandler('zadanie', pageExerciseCmd))
+updater.dispatcher.add_handler(CommandHandler('page', pageCmd))
 updater.dispatcher.add_handler(CommandHandler('strona', pageCmd))
 
+# telegram - start bot
 updater.start_polling()
 print('Bot started successfully')
+
+# odrabiamy - downloaded html (temporary - TO-DO: do it better and remove this)
 fullHtml = ' '
