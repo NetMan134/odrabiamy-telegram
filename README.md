@@ -13,9 +13,8 @@ odrabiamy-telegram is a Telegram bot client for odrabiamy.pl
 ## Limit
 Odrabiamy.pl has a limit for browsing solutions to exercises, it's 60 exercises a day, and it resets at 12:00 AM every day.
 Script after downloading about ~45 pages may crash, and on Odrabiamy.pl webpage, a warning message shown below will be visible.
+!["odrabiamy.pl warning message"](https://raw.githubusercontent.com/NetMan134/odrabiamy-telegram/netman/warning.png "odrabiamy.pl warning message")
 If you want to continue with acquiring data via this bot, click "Got it" and continue.
-
-(add a odrabiamy warning message here)
 
 ## Inspiration(s)
 * [doteq/odrabiamy-bot](https://github.com/doteq/odrabiamy-bot "doteq/odrabiamy-bot")
