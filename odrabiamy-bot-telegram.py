@@ -38,26 +38,6 @@ if odrabiamyToken == False:
     quit()
 
 
-# odrabiamy - download page exercise
-def downloadPageExercise():
-    requestPageGet = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{pageNo}/{bookId}',
-        headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {odrabiamyToken}'}).content.decode('utf-8')
-    listOfData = json.loads(requestPageGet).get('data')
-    forExercise = forExercises = 0
-    for exercise in listOfData:
-        global bookName, exerciseNo, fullHtml
-        if exercise['id'] == exerciseId:
-            break
-        forExercise += 1
-    while forExercises <= forExercise:
-        if str(listOfData[forExercises]['id']) == str(exerciseId):
-            bookName = listOfData[forExercises]['book']['name']
-            exerciseNo = listOfData[forExercises]['number']
-            solution = listOfData[forExercises]['solution']
-            fullHtml = "<h1 style=\"font-weight:700;color:#200;font-family:\'Arial\',sans-serif;\">"\
-             + bookName + "<br>Zadanie " + exerciseNo + ", Strona " + pageNo + "</h1><br>" + solution
-            break
-        forExercises += 1
 
 # odrabiamy - download page
 def downloadPage():
@@ -76,6 +56,7 @@ def downloadPage():
     writeHtmlToFile = f'<head><meta charset="UTF-8"></head><h1 style=\"font-weight:700;color:#200;font-family:\'Arial\',sans-serif;\">{bookName}</h1><br>'
     while forExercises < forExercise:
         exerciseNo = listOfData[forExercises]['number']
+        exerciseId = listOfData[forExercises]['id']
         solution = listOfData[forExercises]['solution']
         solutionParser = BeautifulSoup(solution, 'html.parser')
 
@@ -88,7 +69,8 @@ def downloadPage():
         if not os.path.exists(f'{path}/{bookName}-{bookId}/{pageNo}'):
             os.makedirs(f'{path}/{bookName}-{bookId}/{pageNo}')
         
-        writeHtmlToFile += f'<div id="exercise-"><h1 style=\"font-weight:700;color:#200;font-family:\'Arial\',sans-serif;\">Zadanie {exerciseNo}, Strona {pageNo}</h1>{solutionParser}<br>'
+        # writeHtmlToFile += f'<div id="exercise-{exerciseId}"><h1 style=\"font-weight:700;color:#200;font-family:\'Arial\',sans-serif;\">Zadanie {exerciseNo}, Strona {pageNo}</h1>{solutionParser}</div><br>'
+        writeHtmlToFile += f'<div class="exercise-{exerciseId}"><h1 style=\"font-weight:700;color:#200;font-family:\'Arial\',sans-serif;\">Zadanie {exerciseNo}, Strona {pageNo}</h1>{solutionParser}</div><br>'
 
         forExercises += 1
     jsonExercisesObject = json.dumps(jsonExercisesDict, indent=forExercise)
@@ -126,66 +108,6 @@ def pomoc(update: Update, context: CallbackContext):
          + "```https://odrabiamy.pl/nazwa\-przedmiotu/ksiazka\-id/strona\-numer```\n\(lub tak jak w komendzie /zadanie\)"
          , parse_mode='MarkdownV2')
 
-# telegram - /exercise or /zadanie command
-def pageExerciseCmd(update: Update, context: CallbackContext):
-    if 'odrabiamy.pl' in update.message.text:
-        urlArguments = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
-        global bookId, pageNo, exerciseId, user
-        user = update.message.from_user
-        print('User \"{}\" (id: {}) requested exercise download of:'.format(user['username'], user['id']))
-        subject = urlArguments[1]
-        bookId = urlArguments[2].split('-')[1]
-        pageNo = urlArguments[3].split('-')[1]
-        exerciseId = urlArguments[4].split('-')[1]
-        print("subject: " + subject + "\nbookId: " + bookId + "\npageNo: " + pageNo + "\nexerciseId: " + exerciseId)
-        update.message.reply_text("Przedmiot: " + subject + "\nIdentyfikator książki: " + bookId + "\nStrona: " + pageNo + "\nIdentyfikator zadania: " + exerciseId)
-        downloadPageExercise(); update.message.reply_text("Pobrano zadanie pomyślnie, generowanie zdjęcia...")
-
-        async def generatePng():
-            browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
-            newPage = await browser.newPage(); await newPage.goto("data:text/html;charset=utf-8," + fullHtml, {'waitUntil':'networkidle0'})
-            global finalPngOutput
-            finalPngOutput = await newPage.screenshot({'fullPage': 'true'})
-            await browser.close()
-
-        runGeneratePng = asyncio.new_event_loop()
-        asyncio.set_event_loop(runGeneratePng)
-        print('Starting PNG Capture...')
-        runGeneratePng.run_until_complete(generatePng())
-        print('Completed PNG Capture')
-        context.bot.send_document(update.effective_chat.id,
-            BytesIO(finalPngOutput),filename=f"{bookName}_Strona {pageNo}_Zadanie {exerciseNo}.png")
-        print('Sent!\n')
-
-
-# telegram - /page or /strona command
-def pageCmd(update: Update, context: CallbackContext):
-    if 'odrabiamy.pl' in update.message.text:
-        urlArguments = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
-        global bookId, pageNo, exerciseId, user
-        user = update.message.from_user
-        print('User \"{}\" (id: {}) requested page download of:'.format(user['username'], user['id']))
-        subject = urlArguments[1]        
-        bookId = urlArguments[2].split('-')[1]
-        pageNo = urlArguments[3].split('-')[1]
-        print(f'subject: {subject}\nbookId: {bookId}\npageNo: {pageNo}')
-        update.message.reply_text("Przedmiot: " + subject + "\nIdentyfikator książki: " + bookId + "\nStrona: " + pageNo)
-        downloadPage(); update.message.reply_text("Pobrano stronę pomyślnie, generowanie zdjęcia...")
-
-        async def generatePng():
-            browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
-            newPage = await browser.newPage(); await newPage.goto("data:text/html;charset=utf-8," + fullHtml, {'waitUntil':'networkidle0'})
-            global finalPngOutput
-            finalPngOutput = await newPage.screenshot({'fullPage': 'true'})
-            await browser.close()
-
-        runGeneratePng = asyncio.new_event_loop()
-        asyncio.set_event_loop(runGeneratePng)
-        print('Starting PNG Capture...')
-        runGeneratePng.run_until_complete(generatePng())
-        print('Completed PNG Capture')
-        context.bot.send_document(update.effective_chat.id,
-            BytesIO(finalPngOutput),filename=f"{bookName}_Strona {pageNo}_Zadanie {exerciseNo}.png")
 
 
 def pageDiskCmd(update: Update, context: CallbackContext):
@@ -214,7 +136,7 @@ def pageDiskCmd(update: Update, context: CallbackContext):
             print('Opening from local...\n')
             requestLocal = 'Local'
         
-        global openFile
+        # global openFile
         openFile = open(f'{path}/{bookName}-{bookId}/{pageNo}/index.html', 'r', encoding='utf-8').read()
 
         async def generatePng():
@@ -234,17 +156,73 @@ def pageDiskCmd(update: Update, context: CallbackContext):
         context.bot.send_document(update.effective_chat.id,
             BytesIO(finalPngOutput),filename=f"{requestLocal}_{bookName}_Strona_{pageNo}.png")
 
+def pageExerciseDiskCmd(update: Update, context: CallbackContext):
+    if 'odrabiamy.pl' in update.message.text:
+        global bookId, pageNo, exerciseId, user, requestLocal, bookName
+        urlArguments = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+        subject = urlArguments[1]        
+        bookId = urlArguments[2].split('-')[1]
+        pageNo = urlArguments[3].split('-')[1]
+        exerciseId = urlArguments[4].split('-')[1]
+        user = update.message.from_user
+        print('User \"{}\" (id: {}) requested page EXERCISE OPEN of:'.format(user['username'], user['id']))
+        print("subject: " + subject + "\nbookId: " + bookId + "\npageNo: " + pageNo)
+        update.message.reply_text("Przedmiot: " + subject + "\nIdentyfikator książki: " + bookId + "\nStrona: " + pageNo + "\nIdentyfikator zadania: " + exerciseId)
+        # downloadPage(); update.message.reply_text("Pobrano stronę pomyślnie, generowanie zdjęcia...")
+        bookGetRequest = requests.get(url=f'https://odrabiamy.pl/api/v3/books/{bookId}').content.decode('utf-8')
+        listBook = json.loads(bookGetRequest)
+        if listBook.get('name') == None:
+            print('Wrong bookId\n')
+            return
+        
+        bookName = listBook['name']
+        if not os.path.exists(f'{path}/{bookName}-{bookId}/{pageNo}'):
+            print('Requesting download from server...\n')
+            downloadPage()
+        else:
+            print('Opening from local...\n')
+            requestLocal = 'Local'
+        
+        # global openFile
+        openFile = open(f'{path}/{bookName}-{bookId}/{pageNo}/index.html', 'r', encoding='utf-8').read()
+
+        soupFromFile = BeautifulSoup(openFile, 'html.parser')
+        getExerciseFromFile = str(soupFromFile.find('div', class_=f'exercise-{exerciseId}').extract())
+
+        async def generatePng():
+            browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
+            # newPage = await browser.newPage(); await newPage.goto("data:text/html;charset=utf-8," + openFile, {'waitUntil':'networkidle0'})
+            newPage = await browser.newPage(); await newPage.goto("data:text/html;charset=utf-8," + getExerciseFromFile, {'waitUntil':'networkidle0'})
+            time.sleep(0.5)
+            global finalPngOutput
+            finalPngOutput = await newPage.screenshot({'fullPage': 'true'})
+            time.sleep(0.5)
+            await browser.close()
+
+        runGeneratePng = asyncio.new_event_loop()
+        asyncio.set_event_loop(runGeneratePng)
+        print('Starting PNG Capture...')
+        runGeneratePng.run_until_complete(generatePng())
+        print('Completed PNG Capture')
+        context.bot.send_document(update.effective_chat.id,
+            BytesIO(finalPngOutput),filename=f"{requestLocal}_{bookName}_Strona_{pageNo}.png")
+
 
 # telegram - handle commands and redirect to functions
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(CommandHandler('help', help))
 updater.dispatcher.add_handler(CommandHandler('pomoc', pomoc))
-updater.dispatcher.add_handler(CommandHandler('exercise', pageExerciseCmd))
-updater.dispatcher.add_handler(CommandHandler('zadanie', pageExerciseCmd))
-updater.dispatcher.add_handler(CommandHandler('dysk', pageDiskCmd))
-updater.dispatcher.add_handler(CommandHandler('disk', pageDiskCmd))
-updater.dispatcher.add_handler(CommandHandler('page', pageCmd))
-updater.dispatcher.add_handler(CommandHandler('strona', pageCmd))
+# updater.dispatcher.add_handler(CommandHandler('exercise', pageExerciseCmd))
+# updater.dispatcher.add_handler(CommandHandler('zadanie', pageExerciseCmd))
+# updater.dispatcher.add_handler(CommandHandler('dysk', pageDiskCmd))
+# updater.dispatcher.add_handler(CommandHandler('disk', pageDiskCmd))
+# updater.dispatcher.add_handler(CommandHandler('diskex', pageExerciseDiskCmd))
+# updater.dispatcher.add_handler(CommandHandler('page', pageCmd))
+# updater.dispatcher.add_handler(CommandHandler('strona', pageCmd))
+updater.dispatcher.add_handler(CommandHandler('exercise', pageExerciseDiskCmd))
+updater.dispatcher.add_handler(CommandHandler('zadanie', pageExerciseDiskCmd))
+updater.dispatcher.add_handler(CommandHandler('page', pageDiskCmd))
+updater.dispatcher.add_handler(CommandHandler('strona', pageDiskCmd))
 
 # telegram - start bot
 updater.start_polling()
@@ -253,3 +231,91 @@ print('\nBot started successfully')
 # odrabiamy - downloaded html (temporary - TO-DO: do it better and remove this)
 fullHtml = ' '
 writeHtmlToFile = ' '
+
+
+
+# old code
+
+# telegram - /exercise or /zadanie command
+# def pageExerciseCmd(update: Update, context: CallbackContext):
+#     if 'odrabiamy.pl' in update.message.text:
+#         urlArguments = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+#         global bookId, pageNo, exerciseId, user
+#         user = update.message.from_user
+#         print('User \"{}\" (id: {}) requested exercise download of:'.format(user['username'], user['id']))
+#         subject = urlArguments[1]
+#         bookId = urlArguments[2].split('-')[1]
+#         pageNo = urlArguments[3].split('-')[1]
+#         exerciseId = urlArguments[4].split('-')[1]
+#         print("subject: " + subject + "\nbookId: " + bookId + "\npageNo: " + pageNo + "\nexerciseId: " + exerciseId)
+#         update.message.reply_text("Przedmiot: " + subject + "\nIdentyfikator książki: " + bookId + "\nStrona: " + pageNo + "\nIdentyfikator zadania: " + exerciseId)
+#         downloadPageExercise(); update.message.reply_text("Pobrano zadanie pomyślnie, generowanie zdjęcia...")
+
+#         async def generatePng():
+#             browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
+#             newPage = await browser.newPage(); await newPage.goto("data:text/html;charset=utf-8," + fullHtml, {'waitUntil':'networkidle0'})
+#             global finalPngOutput
+#             finalPngOutput = await newPage.screenshot({'fullPage': 'true'})
+#             await browser.close()
+
+#         runGeneratePng = asyncio.new_event_loop()
+#         asyncio.set_event_loop(runGeneratePng)
+#         print('Starting PNG Capture...')
+#         runGeneratePng.run_until_complete(generatePng())
+#         print('Completed PNG Capture')
+#         context.bot.send_document(update.effective_chat.id,
+#             BytesIO(finalPngOutput),filename=f"{bookName}_Strona {pageNo}_Zadanie {exerciseNo}.png")
+#         print('Sent!\n')
+
+
+# # telegram - /page or /strona command
+# def pageCmd(update: Update, context: CallbackContext):
+#     if 'odrabiamy.pl' in update.message.text:
+#         urlArguments = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+#         global bookId, pageNo, exerciseId, user
+#         user = update.message.from_user
+#         print('User \"{}\" (id: {}) requested page download of:'.format(user['username'], user['id']))
+#         subject = urlArguments[1]        
+#         bookId = urlArguments[2].split('-')[1]
+#         pageNo = urlArguments[3].split('-')[1]
+#         print(f'subject: {subject}\nbookId: {bookId}\npageNo: {pageNo}')
+#         update.message.reply_text("Przedmiot: " + subject + "\nIdentyfikator książki: " + bookId + "\nStrona: " + pageNo)
+#         downloadPage(); update.message.reply_text("Pobrano stronę pomyślnie, generowanie zdjęcia...")
+
+#         async def generatePng():
+#             browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
+#             newPage = await browser.newPage(); await newPage.goto("data:text/html;charset=utf-8," + fullHtml, {'waitUntil':'networkidle0'})
+#             global finalPngOutput
+#             finalPngOutput = await newPage.screenshot({'fullPage': 'true'})
+#             await browser.close()
+
+#         runGeneratePng = asyncio.new_event_loop()
+#         asyncio.set_event_loop(runGeneratePng)
+#         print('Starting PNG Capture...')
+#         runGeneratePng.run_until_complete(generatePng())
+#         print('Completed PNG Capture')
+#         context.bot.send_document(update.effective_chat.id,
+#             BytesIO(finalPngOutput),filename=f"{bookName}_Strona {pageNo}_Zadanie {exerciseNo}.png")
+
+
+
+# odrabiamy - download page exercise
+# def downloadPageExercise():
+#     requestPageGet = requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{pageNo}/{bookId}',
+#         headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {odrabiamyToken}'}).content.decode('utf-8')
+#     listOfData = json.loads(requestPageGet).get('data')
+#     forExercise = forExercises = 0
+#     for exercise in listOfData:
+#         global bookName, exerciseNo, fullHtml
+#         if exercise['id'] == exerciseId:
+#             break
+#         forExercise += 1
+#     while forExercises <= forExercise:
+#         if str(listOfData[forExercises]['id']) == str(exerciseId):
+#             bookName = listOfData[forExercises]['book']['name']
+#             exerciseNo = listOfData[forExercises]['number']
+#             solution = listOfData[forExercises]['solution']
+#             fullHtml = "<h1 style=\"font-weight:700;color:#200;font-family:\'Arial\',sans-serif;\">"\
+#              + bookName + "<br>Zadanie " + exerciseNo + ", Strona " + pageNo + "</h1><br>" + solution
+#             break
+#         forExercises += 1
