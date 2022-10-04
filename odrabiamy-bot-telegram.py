@@ -129,11 +129,25 @@ def processCmd(update: Update, context: CallbackContext):
             getFileContents = str(soupFromFile)
 
         async def generatePng():
-            browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
+            browser = await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False, args=['--allow-file-access-from-files', '--enable-local-file-accesses', '--no-sandbox'])
             newPage = await browser.newPage()
+            soupFile = BeautifulSoup(getFileContents, 'html.parser')
+            img_num = 0
+            if not os.path.exists(f'/images/{pageNo}/{exerciseId}'):
+                os.makedirs(f'/images/{pageNo}/{exerciseId}')
+
+            for img in soupFile.find_all('img'):
+                data = img['src']
+                r = requests.get(data)
+                soupFile.find('img', src=data)['src'] = str(f'http://127.0.0.1:8012/{pageNo}/{exerciseId}/{img_num}.jpg')
+                with open(f'/images/{exerciseId}/{img_num}.jpg','wb') as f:
+                    img_num += 1
+                    f.write(r.content)
+                    f.close()
             # await newPage.goto("data:text/html;charset=utf-8," + getFileContents, {'waitUntil':'networkidle0'})
-            await newPage.goto("data:text/html;charset=utf-8," + getFileContents, {'waitUntil':'domcontentloaded'})
-            time.sleep(4); global finalPngOutput
+            await newPage.goto("data:text/html;charset=utf-8," + str(soupFile), {'waitUntil':'networkidle0'})
+            # await newPage.goto("data:text/html;charset=utf-8," + getFileContents, {'waitUntil':'domcontentloaded'})
+            time.sleep(1); global finalPngOutput
             finalPngOutput = await newPage.screenshot({'fullPage': 'true'})
             await browser.close()
 
