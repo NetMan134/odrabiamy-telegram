@@ -28,9 +28,23 @@ odrabiamy-telegram is a Telegram bot client for odrabiamy.pl
     - `python3 -m venv odrabiamy-venv`
     - `source odrabiamy-venv/bin/activate`
     - `pip install -r requirements.txt`
+    - `pip install python-telegram-bot[job-queue]`
     - `playwright install`
     - `chmod a+x run.sh`
-9. launch run.sh! (`./run.sh`)
+9. launch run.sh (`./run.sh`) - if you want to run it again, make sure odrabiamy-venv is loaded, if you're not sure or it isn't initialized, run `source odrabiamy-venv/bin/activate` and then launch run.sh
+10. if you try to interact with the bot, it will spit out a message about contacting the administrator (in polish) also providing user's ID - the user has to message you in order for you to acquire this ID (of course from users that you want to have access to your instance of this bot) - then insert it into `whitelist.txt` - you can do that on the fly, in other words you don't have to restart the bot every time you add a new user to the whitelist<br>Lines with # at the start qualify as comments, IDs should be put in their own line without any unwanted characters besides numbers of course (duh), spaces etc...<h3 style="margin:0;padding:0;">Example `whitelist.txt`:</h3>
+    ```
+    # A comment, for example who does this ID below belong to
+    1234567890
+    # John Smith
+    9876543215
+    # Max Deidre
+    6565656566
+    # [etc...]
+    4323424324
+    # idk a psychopath or sth
+    9090678467
+    ```
 
 
     <!-- !["postgresql table config"](https://raw.githubusercontent.com/NetMan134/odrabiamy-telegram/master/postgresql-table.png "postgresql table config")<br> -->
@@ -43,7 +57,7 @@ odrabiamy-telegram is a Telegram bot client for odrabiamy.pl
     * `DB_PASS`,
     * `DB_NAME`
 4. Run the script! (`python odrabiamy-bot-telegram.py`) -->
-<!-- 
+<!--
 ## Usage with docker-compose (not recommended FOR NOW, need to check this later)
 1. Edit docker-compose.yml, set environment variables:
     * `ODRABIAMY_LOGIN`,

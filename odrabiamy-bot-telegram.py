@@ -35,6 +35,7 @@ from io import BytesIO
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from PIL import Image
+from functools import wraps
 import psycopg2, base64, requests, json, time, threading
 
 # enable logging
@@ -57,8 +58,6 @@ def get_odrabiamy_token(email, password):
 # odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
 odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
 
-<<<<<<< Updated upstream
-=======
 
 # whitelist
 def restricted(func):
@@ -81,7 +80,6 @@ def restricted(func):
     return wrapped
 
 
->>>>>>> Stashed changes
 def get_from_db(chosen_book_id, chosen_page_no):
     """Get content and exercises from a local PostgreSQL database"""
     psql_connection = psycopg2.connect(dbname=DATABASE_NAME, user=DATABASE_USER, host=DATABASE_HOST, password=DATABASE_PASSWORD, port=DATABASE_PORT)
@@ -110,7 +108,7 @@ def page_download(downloaded_book_id, downloaded_page_no):
     list_of_exercise_nos = []
     for exercise in page_data:
         sum_of_exercises += 1
-    page_html = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{downloaded_book_name}</h1>'
+    page_html = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{downloaded_book_name}<br>{chosen_book_kind}, {chosen_book_authors}, {chosen_book_released}, {chosen_book_publisher}</h1>'
     while active_exercise < sum_of_exercises:
         active_exercise_no = page_data[active_exercise]['number']
         active_exercise_id = page_data[active_exercise]['id']
@@ -139,7 +137,7 @@ def page_download(downloaded_book_id, downloaded_page_no):
     psql_cursor.execute("INSERT INTO {} VALUES ({}, {}, \'{} -separator- {}\', \'{}\');".format(DATABASE_TABLE, downloaded_book_id, downloaded_page_no, str_list_of_ex_id, str_list_of_ex_no, page_html_apostrophes))
     psql_connection.commit(); psql_cursor.close(); psql_connection.close()
 
-
+@restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Encourages to send odrabiamy link, waits 60 seconds for it, then - times out (timeout specified in main())"""
     user = update.message.from_user
@@ -148,11 +146,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     return TYPE_LINK
 
-
 async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Parses list of exercises from specified page and displays button options for them"""
     user = update.message.from_user
-    global chosen_book_name
+    global chosen_book_name, chosen_book_kind, chosen_book_authors, chosen_book_released, chosen_book_publisher
     try:
         sent_url = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
         chosen_book_id = sent_url[2].split('-')[1]
@@ -161,8 +158,12 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await update.message.reply_text('Nie ma takiej książki, spróbuj ponownie')
             await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
             logger.info("User %s (@%s, id: %s) typed wrong book, (waiting 60s for a link).", user.first_name, user.username, user.id)
-            return TYPE_LINK
+            return TYPE_LINK    
         chosen_book_name = str(json.loads(get_book).get('name'))
+        chosen_book_kind = str(json.loads(get_book).get('kind'))
+        chosen_book_authors = str(json.loads(get_book).get('authors'))
+        chosen_book_released = str(json.loads(get_book).get('released'))
+        chosen_book_publisher = str(json.loads(get_book).get('publisher'))
         try:
             chosen_page_no = sent_url[3].split('-')[1]
         except IndexError:
@@ -198,7 +199,7 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             list_of_exercises.append(str(exercise['number']))
     else:
         exercise_data = db_exercises_list.split("-separator-", 2)
-        list_of_exercises = exercise_data[1].replace('[', '').replace(']', '').replace('\"', '').strip().split(',')
+        list_of_exercises = exercise_data[1].replace('[', '').replace(']', '').replace('\"', '').replace(' ', '').strip().split(',')
         list_of_exercise_ids = exercise_data[0].replace(' ', '').replace('[', '').replace(']', '').replace('\"', '').strip().split(',')
 
     def build_menu(buttons, columns, header_buttons = None, footer_buttons = None):
@@ -213,6 +214,7 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     for each in list_of_exercises:
         button_list.append(InlineKeyboardButton(each, callback_data = str(list_of_exercise_ids[a]) + " {} {} {}".format(chosen_book_id, chosen_page_no, str(each))))
         a += 1
+    print(list_of_exercises)
     button_list.append(InlineKeyboardButton('split', callback_data = 'split' + " {} {}".format(chosen_book_id, chosen_page_no)))
     button_list.append(InlineKeyboardButton('all', callback_data = 'all' + " {} {}".format(chosen_book_id, chosen_page_no)))
     reply_markup = InlineKeyboardMarkup(build_menu(button_list, columns = 3))
@@ -260,7 +262,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             getFileContents = str(soupFromFile)
             logger.info("User %s (@%s, id: %s) - capturing (all).", user.first_name, user.username, user.id)
         else:
-            getFileContents = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{chosen_book_name}</h1>'
+            getFileContents = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{chosen_book_name}<br>{chosen_book_kind}, {chosen_book_authors}, {chosen_book_released}, {chosen_book_publisher}</h1>'
             getFileContents += str(soupFromFile.find('div', class_=f'exercise-{chosen_exercise_id}').extract())
             logger.info("User %s (@%s, id: %s) - capturing (exercise_id: %s).", user.first_name, user.username, user.id, chosen_exercise_id)
         getFileContents = getFileContents.replace('\'\'', "\'")
@@ -303,7 +305,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         for exercise in ex_p_data:
             list_of_exercise_ids.append(str(exercise['id']))
         for exercise in list_of_exercise_ids:
-            getFileContents = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{chosen_book_name}</h1>'
+            getFileContents = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{chosen_book_name}<br>{chosen_book_kind}, {chosen_book_authors}, {chosen_book_released}, {chosen_book_publisher}</h1>'
             getFileContents += str(soupFromFile.find('div', class_=f'exercise-{exercise}').extract())
             getFileContents = getFileContents.replace('\'\'', "\'")
             page_html_clean = str(getFileContents.replace('\\xa0', '\\xc2\\xa0').encode("utf-8"))\
@@ -339,6 +341,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     return ConversationHandler.END
 
 
+@restricted
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays info on how to use the bot."""
     user = update.message.from_user
