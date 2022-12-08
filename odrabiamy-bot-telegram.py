@@ -57,6 +57,31 @@ def get_odrabiamy_token(email, password):
 # odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
 odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
 
+<<<<<<< Updated upstream
+=======
+
+# whitelist
+def restricted(func):
+    @wraps(func)
+    async def wrapped(update, context, *args, **kwargs):
+        user = update.message.from_user
+        user_id = update.effective_user.id
+        WHITELIST = []
+        with open('whitelist.txt') as input_data:
+            for num in input_data.readlines():
+                try:
+                    WHITELIST.append(int(num.split()[0]))
+                except ValueError:
+                    pass
+        if user_id not in WHITELIST:
+            logger.info("Unauthorized - ID: %s, Name: %s, Username: @%s).", user_id, user.first_name, user.username)
+            await update.message.reply_text(f"Skontaktuj się z administratorem bota\ni podaj mu to ID: `{user_id}`\na jeśli go nie znasz \- nie powinno Cię tu być ;\)", parse_mode='MarkdownV2')
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapped
+
+
+>>>>>>> Stashed changes
 def get_from_db(chosen_book_id, chosen_page_no):
     """Get content and exercises from a local PostgreSQL database"""
     psql_connection = psycopg2.connect(dbname=DATABASE_NAME, user=DATABASE_USER, host=DATABASE_HOST, password=DATABASE_PASSWORD, port=DATABASE_PORT)
