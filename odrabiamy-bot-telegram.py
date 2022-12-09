@@ -69,7 +69,10 @@ def restricted(func):
         with open('whitelist.txt') as input_data:
             for num in input_data.readlines():
                 try:
-                    WHITELIST.append(int(num.split()[0]))
+                    try:
+                        WHITELIST.append(int(num.split()[0]))
+                    expect IndexError:
+                        pass
                 except ValueError:
                     pass
         if user_id not in WHITELIST:
