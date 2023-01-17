@@ -32,7 +32,7 @@ odrabiamy-telegram is a Telegram bot client for odrabiamy.pl
     - `playwright install`
     - `chmod a+x run.sh`
 9. launch run.sh (`./run.sh`) - if you want to run it again, make sure odrabiamy-venv is loaded, if you're not sure or it isn't initialized, run `source odrabiamy-venv/bin/activate` and then launch run.sh
-10. if you try to interact with the bot, it will spit out a message about contacting the administrator (in polish) also providing user's ID - the user has to message you in order for you to acquire this ID (of course from users that you want to have access to your instance of this bot) - then insert it into `whitelist.txt` - you can do that on the fly, in other words you don't have to restart the bot every time you add a new user to the whitelist<br>Lines with # at the start qualify as comments, IDs should be put in their own line without any unwanted characters besides numbers of course (duh), spaces etc...<h3 style="margin:0;padding:0;">Example `whitelist.txt`:</h3>
+10. if you try to interact with the bot, it will spit out a message about contacting the administrator (in polish for end-users friendliness) also providing user's ID - the user has to message you in order for you to acquire this ID (of course from users that you want to have access to your instance of this bot) - then insert it into `whitelist.txt` - you can do that on the fly, in other words you don't have to restart the bot every time you add a new user to the whitelist<br>Lines with # at the start qualify as comments, IDs should be put in their own line without any unwanted characters besides numbers of course (duh), spaces etc...<h3 style="margin:0;padding:0;">Example `whitelist.txt`:</h3>
     ```
     # A comment, for example who does this ID below belong to
     1234567890
@@ -77,17 +77,20 @@ If you want to continue with acquiring data via this bot, click "Got it" and con
 
 ## Inspiration(s)
 * [doteq/odrabiamy-bot](https://github.com/doteq/odrabiamy-bot "doteq/odrabiamy-bot")
+* [m1chaelbarry/odrabiamy-bot](https://github.com/m1chaelbarry/odrabiamy-bot "m1chaelbarry/odrabiamy-bot")
 * [KartoniarzEssa/BetterOdrabiamyDownloader](https://github.com/KartoniarzEssa/BetterOdrabiamyDownloader "KartoniarzEssa/BetterOdrabiamyDownloader")
 
 ## To-Do list:
 - [X] use postgresql
-- [ ] python - docker, docker-compose
-- [ ] clean-up code
-- [ ] secure way of storing secrets
+- [ ] full dockerization
+- [ ] code clean-up
+- [ ] more secure way of storing secrets
+- [ ] provide a user-friendly first-time run shell script
 
 ## Warning
-Using odrabiamy.pl API with external programs, scripts is possible only with administration consent.
+Using odrabiamy.pl API with external programs, scripts is allowed only with administration consent.
 User takes all the responsibility for their actions when using this program.
 
 ## License
-This project is covered under GNU General Public License Version 3.
+This project is licensed under GNU General Public License Version 3.
+See [LICENSE](https://github.com/NetMan134/odrabiamy-telegram/blob/master/LICENSE) for more information.
