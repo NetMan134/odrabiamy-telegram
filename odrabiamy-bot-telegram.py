@@ -24,7 +24,7 @@ except ImportError:
     __version_info__ = (0, 0, 0, 0, 0)  # type: ignore[assignment]
 if __version_info__ < (20, 0, 0, "alpha", 1):
     raise RuntimeError(
-        f"This script is not compatible with your current PTB version {TG_VER}."
+        f"This script is not compatible with your current version {TG_VER}."
         f"Please install python-telegram-bot~=20.04a"
     )
 
@@ -52,7 +52,7 @@ def get_odrabiamy_token(email, password):
         return_token = json.loads(get_token).get('data').get('token')
         return return_token
     except:
-        logger.error("Incorrect login details for odrabiamy. (Or no internet connection?)")
+        logger.error("Incorrect login details for odrabiamy. (Or no internet connection/outage?)")
         quit()
 
 # odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
@@ -71,7 +71,7 @@ def restricted(func):
                 try:
                     try:
                         WHITELIST.append(int(num.split()[0]))
-                    expect IndexError:
+                    except IndexError:
                         pass
                 except ValueError:
                     pass
@@ -100,16 +100,34 @@ def get_from_db(chosen_book_id, chosen_page_no):
     psql_cursor.close(); psql_connection.close()
     return content, exercises_list
 
+"""Download images from odrabiamy in multiple threads and not in queue (performance-wise)"""
+def image_download_thread(data):
+    image = requests.get(data)
+    base64_image = base64.b64encode(image.content).decode('utf-8')
+    return base64_image, data
+class ThreadWithReturnValue(threading.Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        threading.Thread.__init__(self, group, target, name, args, kwargs)
+        self._return = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args,
+                                                **self._kwargs)
+    def join(self, *args):
+        threading.Thread.join(self, *args)
+        return self._return
+
 def page_download(downloaded_book_id, downloaded_page_no):
     """Download page solution and insert it into PostgreSQL database"""
     page_data = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{downloaded_page_no}/{downloaded_book_id}',
         headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {odrabiamy_token}'})\
         .content.decode('utf-8')).get('data')
     downloaded_book_name = page_data[0]['book']['name']
-    sum_of_exercises = active_exercise = 0
-    list_of_exercise_ids = []
-    list_of_exercise_nos = []
-    for exercise in page_data:
+    sum_of_exercises = 0; active_exercise = 0
+    list_of_exercise_ids = []; list_of_exercise_nos = []
+    for UNUSED_an_exercise in page_data:
         sum_of_exercises += 1
     page_html = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{downloaded_book_name}<br>{chosen_book_kind}, {chosen_book_authors}, {chosen_book_released}, {chosen_book_publisher}</h1>'
     while active_exercise < sum_of_exercises:
@@ -126,11 +144,17 @@ def page_download(downloaded_book_id, downloaded_page_no):
         page_html += f'<div class="exercise-{active_exercise_id}"><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>Zadanie {active_exercise_no}, Strona {downloaded_page_no}</h1>{active_exercise_solution}</div><br>'
         active_exercise += 1
     page_html_with_base64_imgs = BeautifulSoup(page_html, 'html.parser')
+    threads = []; iterimgs = 0
     for img in page_html_with_base64_imgs.find_all('img'):
         data = img['src']
-        image = requests.get(data)
-        base64_image = base64.b64encode(image.content).decode('utf-8')
-        page_html_with_base64_imgs.find('img', src=data)['src'] = 'data:image/jpeg;base64,{}'.format(base64_image)
+        threads.append(ThreadWithReturnValue(target=image_download_thread, args=(str(data),)))
+        threads[iterimgs].start()
+        iterimgs += 1
+    for nrs in range(iterimgs):
+        threadresp = threads[nrs].join()
+        b64data = threadresp[0]
+        dataurl = threadresp[1]
+        page_html_with_base64_imgs.find('img', src=dataurl)['src'] = 'data:image/jpeg;base64,{}'.format(b64data)
     page_html_apostrophes = str(page_html_with_base64_imgs).replace('\'', '\'\'')
     str_list_of_ex_id = str(list_of_exercise_ids).replace('\'', '\"')
     str_list_of_ex_no = str(list_of_exercise_nos).replace('\'', '\"')
@@ -217,7 +241,6 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     for each in list_of_exercises:
         button_list.append(InlineKeyboardButton(each, callback_data = str(list_of_exercise_ids[a]) + " {} {} {}".format(chosen_book_id, chosen_page_no, str(each))))
         a += 1
-    print(list_of_exercises)
     button_list.append(InlineKeyboardButton('split', callback_data = 'split' + " {} {}".format(chosen_book_id, chosen_page_no)))
     button_list.append(InlineKeyboardButton('all', callback_data = 'all' + " {} {}".format(chosen_book_id, chosen_page_no)))
     reply_markup = InlineKeyboardMarkup(build_menu(button_list, columns = 3))
@@ -227,6 +250,94 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     logger.info("User %s (@%s, id: %s) - waiting for button response.", user.first_name, user.username, user.id)
     return SELECT_BUTTON
+
+@restricted
+async def start_get(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Encourages to send odrabiamy link, waits 60 seconds for it, then - times out (timeout specified in main())"""
+    user = update.message.from_user
+    logger.info("User %s (@%s, id: %s) started the /GET the conversation", user.first_name, user.username, user.id)
+
+    if 'odrabiamy.pl' in update.message.text:
+        """Parses list of exercises from specified page and displays button options for them"""
+        global chosen_book_name, chosen_book_kind, chosen_book_authors, chosen_book_released, chosen_book_publisher
+        try:
+            sent_url = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+            chosen_book_id = sent_url[2].split('-')[1]
+            get_book = requests.get(url=f'https://odrabiamy.pl/api/v3/books/{chosen_book_id}').content.decode('utf-8')
+            if json.loads(get_book).get('name') == None:
+                await update.message.reply_text('Nie ma takiej książki, spróbuj ponownie')
+                logger.info("User %s (@%s, id: %s) typed wrong book in /GET", user.first_name, user.username, user.id)
+            chosen_book_name = str(json.loads(get_book).get('name'))
+            chosen_book_kind = str(json.loads(get_book).get('kind'))
+            chosen_book_authors = str(json.loads(get_book).get('authors'))
+            chosen_book_released = str(json.loads(get_book).get('released'))
+            chosen_book_publisher = str(json.loads(get_book).get('publisher'))
+            try:
+                chosen_page_no = sent_url[3].split('-')[1]
+            except IndexError:
+                chosen_page_no = json.loads(get_book)['pages'][0]
+            if int(chosen_page_no) in json.loads(get_book)['pages']:
+                pass
+            else:
+                await update.message.reply_text('Nie ma takiej strony, spróbuj ponownie')
+                await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
+                logger.info("User %s (@%s, id: %s) typed wrong page in /GET", user.first_name, user.username, user.id)
+            try:
+                chosen_exercise_id = sent_url[4].split('-')[1]
+            except IndexError:
+                chosen_exercise_id = 'null'
+        except IndexError:
+            await update.message.reply_text('Niepoprawny adres URL')
+            logger.info("User %s (@%s, id: %s) typed wrong link in /GET", user.first_name, user.username, user.id)
+
+        clean_data = get_from_db(str(chosen_book_id), str(chosen_page_no))[0]
+        if clean_data == "":
+            logger.info("User %s (@%s, id: %s) - requesting download from odrabiamy.", user.first_name, user.username, user.id)
+            page_download(str(chosen_book_id), str(chosen_page_no))
+            clean_data = get_from_db(str(chosen_book_id), str(chosen_page_no))[0]
+            request_or_local = 'R'
+        else:
+            logger.info("User %s (@%s, id: %s) - opening from a local database.", user.first_name, user.username, user.id)
+            request_or_local = 'L'
+        clean_data = clean_data.replace('\\\'', '\'')
+        soupFromFile = BeautifulSoup(clean_data, 'html.parser')
+        
+        getFileContents = str(soupFromFile)
+        logger.info("User %s (@%s, id: %s) - capturing (all).", user.first_name, user.username, user.id)
+        getFileContents = getFileContents.replace('\'\'', "\'")
+        page_html_clean = str(getFileContents.replace('\\xa0', '\\xc2\\xa0').encode("utf-8"))\
+            .replace('\\\\', '\\')\
+            .encode().decode('unicode-escape')\
+            .encode('raw-unicode-escape').decode()\
+            .lstrip('b\'').rstrip('\'')
+
+        async def split_exercises_run(playwright):
+            chromium = playwright.firefox
+            browser = await chromium.launch()
+            page = await browser.new_page()
+            await page.set_content('{}'.format(page_html_clean))
+            await page.wait_for_load_state('domcontentloaded')
+            finalPngOutput = await page.screenshot(full_page=True)
+            imgdata = Image.open(BytesIO(finalPngOutput)).size[1]
+            await browser.close()
+            return finalPngOutput, imgdata
+        async with async_playwright() as playwright:
+            playwright_output = await split_exercises_run(playwright)
+        finalPngOutput = playwright_output[0]
+        imgheight = playwright_output[1]
+        if imgheight > 800: document_or_picture = 'd'
+        else: document_or_picture = 'p'
+        if document_or_picture == 'd':
+            await context.bot.send_document(update.effective_chat.id,
+                BytesIO(finalPngOutput),filename=f"{request_or_local}_GET_{chosen_book_name}_Strona_{chosen_page_no}.png")
+        elif document_or_picture == 'p':
+            await context.bot.send_photo(update.effective_chat.id,
+                BytesIO(finalPngOutput),filename=f"{request_or_local}_GET_{chosen_book_name}_Strona_{chosen_page_no}.png")
+
+            logger.info("User %s (@%s, id: %s) - sent (/GET).", user.first_name, user.username, user.id)
+    else:
+        await update.message.reply_text('Składnia: /get <URL do odrabiamy>')
+        logger.info("User %s (@%s, id: %s) typed wrong link in /GET", user.first_name, user.username, user.id)
 
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -289,7 +400,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             playwright_output = await split_exercises_run(playwright)
         finalPngOutput = playwright_output[0]
         imgheight = playwright_output[1]
-        if imgheight > 3000: document_or_picture = 'd'
+        if imgheight > 800: document_or_picture = 'd'
         else: document_or_picture = 'p'
         if document_or_picture == 'd':
             await context.bot.send_document(update.effective_chat.id,
@@ -332,7 +443,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 playwright_output = await split_exercises_run(playwright)
             finalPngOutput = playwright_output[0]
             imgheight = playwright_output[1]
-            if imgheight > 3000: document_or_picture = 'd'
+            if imgheight > 800: document_or_picture = 'd'
             else: document_or_picture = 'p'
             if document_or_picture == 'd':
                 await context.bot.send_document(update.effective_chat.id,
@@ -344,12 +455,13 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     return ConversationHandler.END
 
 
+
 @restricted
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Displays info on how to use the bot."""
     user = update.message.from_user
     logger.info("User %s (@%s, id: %s) requested help menu.", user.first_name, user.username, user.id)
-    await update.message.reply_text("Użyj /start, następnie wyślij link do odrabiamy")
+    await update.message.reply_text("Pomoc odrabiamy-telegram\n\n/start - bot poprosi o link, i wyświeli listę zadań z danej strony, oraz split i all. gdy zostanie wybrany nr zadania, bot wysle tylko to zadanie. gdy zostanie wybrany split, bot rozdzieli wszystkie zadania z tej strony na kazdy plik. gdy zostanie wybrany all, bot wysle wszystkie zadania z tej strony w jednym pliku.\n\n/get - składnia get to: /get <URL do odrabiamy>, bot wysle albo cala strone, albo poszczegolne zadanie w zaleznosci czy link prowadzi do strony, czy do poszczegolnego zadania.")
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -368,6 +480,7 @@ async def refresh_token(update: Update) -> None:
     odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
     logger.info("Refreshed odrabiamy token.")
 
+
 def main() -> None:
     """Run the bot."""
     # create the Application and pass it your bot's token.
@@ -375,6 +488,7 @@ def main() -> None:
     async def post_init(application: Application) -> None:
         commands = [
             ("start", "Start"),
+            ("get", "Start (get - instant url)"),
             ("pomoc", "Pomoc"),
             ("help", "Pomoc"),
             ("anuluj", "Anuluj"),
@@ -390,21 +504,22 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points = [CommandHandler("start", start)],
         states = {
-            TYPE_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, link)],
-            SELECT_BUTTON: [CallbackQueryHandler(button)],
+            TYPE_LINK: [CommandHandler("cancel", cancel), CommandHandler("anuluj", cancel), CommandHandler("stop", cancel), MessageHandler(filters.TEXT, link),],
+            SELECT_BUTTON: [CallbackQueryHandler(button), CommandHandler("cancel", cancel), CommandHandler("anuluj", cancel), CommandHandler("stop", cancel), MessageHandler(filters.ALL, 0),],
         },
         fallbacks = [
             CommandHandler("cancel", cancel),
             CommandHandler("anuluj", cancel),
             CommandHandler("stop", cancel),
         ],
-        conversation_timeout = 60,
+        conversation_timeout = 60, allow_reentry = True,
     )
     conv_handler.check_update(update=Update)
 
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("pomoc", help_command))
+    application.add_handler(CommandHandler("get", start_get))
 
     # run the bot until the user presses Ctrl-C
     application.run_polling()
