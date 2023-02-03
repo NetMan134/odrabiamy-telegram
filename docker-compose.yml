@@ -1,0 +1,20 @@
+version: '3.2'
+services:
+    odrabiamy-db:
+        image: postgres
+        restart: always
+        env_file:
+            - 'variables.env'
+        volumes:
+            - ./db:/var/lib/postgresql/data
+            - ./table.sql:/docker-entrypoint-initdb.d/create_tables.sql
+        expose:
+            - "5432"
+    odrabiamy-app:
+        build: ./
+        env_file:
+            - 'variables.env'
+        volumes:
+            - type: bind
+              source: ./whitelist.txt
+              target: /odrabiamy-bot/whitelist.txt

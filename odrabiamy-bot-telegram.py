@@ -8,9 +8,9 @@ ODRABIAMY_PASS = getenv('ODRABIAMY_PASS')
 
 # postgresql - login variables (stored in environment)
 DATABASE_HOST = getenv('DB_ADDRESS')
-DATABASE_USER = getenv('DB_USER')
-DATABASE_PASSWORD = getenv('DB_PASS')
-DATABASE_NAME = getenv('DB_NAME')
+DATABASE_USER = getenv('POSTGRES_USER')
+DATABASE_PASSWORD = getenv('POSTGRES_PASSWORD')
+DATABASE_NAME = getenv('POSTGRES_DB')
 DATABASE_TABLE = getenv('DB_TABLE')
 DATABASE_PORT = getenv('DB_PORT')
 
@@ -43,6 +43,7 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 TYPE_LINK, SELECT_BUTTON = range(2)
+TYPE_LINKF, SELECT_BUTTONF = range(2)
 
 def get_odrabiamy_token(email, password):
     """Check odrabiamy login details/premium subscription and get token"""
@@ -52,14 +53,14 @@ def get_odrabiamy_token(email, password):
         return_token = json.loads(get_token).get('data').get('token')
         return return_token
     except:
-        logger.error("Incorrect login details for odrabiamy. (Or no internet connection/outage?)")
+        logger.error("Incorrect login details for odrabiamy or connection failed.")
         quit()
 
 # odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
 odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
 
 
-# whitelist
+"""Whitelist checker"""
 def restricted(func):
     @wraps(func)
     async def wrapped(update, context, *args, **kwargs):
@@ -77,14 +78,14 @@ def restricted(func):
                     pass
         if user_id not in WHITELIST:
             logger.info("Unauthorized - ID: %s, Name: %s, Username: @%s).", user_id, user.first_name, user.username)
-            await update.message.reply_text(f"Skontaktuj się z administratorem bota\ni podaj mu to ID: `{user_id}`\na jeśli go nie znasz \- nie powinno Cię tu być ;\)", parse_mode='MarkdownV2')
+            await update.message.reply_text(f"Skontaktuj się z administratorem bota\ni podaj mu to ID: `{user_id}`\nJeśli nie znasz administratora nie powinno Cię tu być ;\)", parse_mode='MarkdownV2')
             return
         return await func(update, context, *args, **kwargs)
     return wrapped
 
 
+"""Get content and exercises from a local PostgreSQL database"""
 def get_from_db(chosen_book_id, chosen_page_no):
-    """Get content and exercises from a local PostgreSQL database"""
     psql_connection = psycopg2.connect(dbname=DATABASE_NAME, user=DATABASE_USER, host=DATABASE_HOST, password=DATABASE_PASSWORD, port=DATABASE_PORT)
     psql_cursor = psql_connection.cursor()
     psql_cursor.execute("SELECT content FROM {}\
@@ -99,6 +100,17 @@ def get_from_db(chosen_book_id, chosen_page_no):
         logger.info("book_id: %s with page_no %s not present in database).", chosen_book_id, chosen_page_no)
     psql_cursor.close(); psql_connection.close()
     return content, exercises_list
+
+
+"""Delete things from a local PostgreSQL database"""
+def del_from_db(chosen_book_id, chosen_page_no):
+    psql_connection = psycopg2.connect(dbname=DATABASE_NAME, user=DATABASE_USER, host=DATABASE_HOST, password=DATABASE_PASSWORD, port=DATABASE_PORT)
+    psql_cursor = psql_connection.cursor()
+    psql_cursor.execute("DELETE FROM {}\
+                    WHERE book_id={} AND page_no={};".format(DATABASE_TABLE ,chosen_book_id, chosen_page_no))
+    logger.info("book_id: %s and page_no %s deleted from database).", chosen_book_id, chosen_page_no)
+    psql_connection.commit(); psql_cursor.close(); psql_connection.close()
+    return
 
 """Download images from odrabiamy in multiple threads and not in queue (performance-wise)"""
 def image_download_thread(data):
@@ -119,8 +131,8 @@ class ThreadWithReturnValue(threading.Thread):
         threading.Thread.join(self, *args)
         return self._return
 
+"""Download page solution and insert it into PostgreSQL database"""
 def page_download(downloaded_book_id, downloaded_page_no):
-    """Download page solution and insert it into PostgreSQL database"""
     page_data = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{downloaded_page_no}/{downloaded_book_id}',
         headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {odrabiamy_token}'})\
         .content.decode('utf-8')).get('data')
@@ -164,17 +176,17 @@ def page_download(downloaded_book_id, downloaded_page_no):
     psql_cursor.execute("INSERT INTO {} VALUES ({}, {}, \'{} -separator- {}\', \'{}\');".format(DATABASE_TABLE, downloaded_book_id, downloaded_page_no, str_list_of_ex_id, str_list_of_ex_no, page_html_apostrophes))
     psql_connection.commit(); psql_cursor.close(); psql_connection.close()
 
+"""Encourages to send odrabiamy link, waits 60 seconds for it, then - times out (timeout specified in main())"""
 @restricted
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Encourages to send odrabiamy link, waits 60 seconds for it, then - times out (timeout specified in main())"""
     user = update.message.from_user
     logger.info("User %s (@%s, id: %s) started the conversation (waiting 60s for a link).", user.first_name, user.username, user.id)
     await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
 
     return TYPE_LINK
 
+"""Parses list of exercises from specified page and displays button options for them"""
 async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Parses list of exercises from specified page and displays button options for them"""
     user = update.message.from_user
     global chosen_book_name, chosen_book_kind, chosen_book_authors, chosen_book_released, chosen_book_publisher
     try:
@@ -251,14 +263,95 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("User %s (@%s, id: %s) - waiting for button response.", user.first_name, user.username, user.id)
     return SELECT_BUTTON
 
+"""Encourages to send odrabiamy link, waits 60 seconds for it, then - times out (timeout specified in main())"""
+@restricted
+async def start_force(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.message.from_user
+    logger.info("User %s (@%s, id: %s) started the conversation [FORCE] (waiting 60s for a link).", user.first_name, user.username, user.id)
+    await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
+
+    return TYPE_LINKF
+
+"""Parses list of exercises from specified page and displays button options for them"""
+async def link_force(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.message.from_user
+    global chosen_book_name, chosen_book_kind, chosen_book_authors, chosen_book_released, chosen_book_publisher
+    try:
+        sent_url = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+        chosen_book_id = sent_url[2].split('-')[1]
+        get_book = requests.get(url=f'https://odrabiamy.pl/api/v3/books/{chosen_book_id}').content.decode('utf-8')
+        if json.loads(get_book).get('name') == None:
+            await update.message.reply_text('Nie ma takiej książki, spróbuj ponownie')
+            await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
+            logger.info("User %s (@%s, id: %s) typed wrong book, (waiting 60s for a link).", user.first_name, user.username, user.id)
+            return TYPE_LINKF
+        chosen_book_name = str(json.loads(get_book).get('name'))
+        chosen_book_kind = str(json.loads(get_book).get('kind'))
+        chosen_book_authors = str(json.loads(get_book).get('authors'))
+        chosen_book_released = str(json.loads(get_book).get('released'))
+        chosen_book_publisher = str(json.loads(get_book).get('publisher'))
+        try:
+            chosen_page_no = sent_url[3].split('-')[1]
+        except IndexError:
+            chosen_page_no = json.loads(get_book)['pages'][0]
+        if int(chosen_page_no) in json.loads(get_book)['pages']:
+            pass
+        else:
+            await update.message.reply_text('Nie ma takiej strony, spróbuj ponownie')
+            await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
+            logger.info("User %s (@%s, id: %s) typed wrong page, (waiting 60s for a link).", user.first_name, user.username, user.id)
+            return TYPE_LINKF
+    except IndexError:
+        await update.message.reply_text('Niepoprawny adres URL')
+        await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
+        logger.info("User %s (@%s, id: %s) typed wrong link, (waiting 60s for a link).", user.first_name, user.username, user.id)
+        return TYPE_LINKF
+
+    await update.message.reply_text(
+        "Pobieranie listy zadań..."
+    )
+
+    del_from_db(str(chosen_book_id), str(chosen_page_no))
+
+    logger.info("User %s (@%s, id: %s) - downloading list of exercises (force).", user.first_name, user.username, user.id)
+    page_no_premium = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/{chosen_page_no}/{chosen_book_id}',
+        headers={'user-agent':'new_user_agent-huawei-144'})\
+        .content.decode('utf-8')).get('data')
+    list_of_exercises = []
+    list_of_exercise_ids = []
+    for exercise in page_no_premium:
+        list_of_exercise_ids.append(str(exercise['id']))
+        list_of_exercises.append(str(exercise['number']))
+
+    def build_menu(buttons, columns, header_buttons = None, footer_buttons = None):
+        menu = [buttons[i:i + columns] for i in range(0, len(buttons), columns)]
+        if header_buttons:
+            menu.insert(0, header_buttons)
+        if footer_buttons:
+            menu.append(footer_buttons)
+        return menu
+    button_list = []
+    a = 0
+    for each in list_of_exercises:
+        button_list.append(InlineKeyboardButton(each, callback_data = str(list_of_exercise_ids[a]) + " {} {} {}".format(chosen_book_id, chosen_page_no, str(each))))
+        a += 1
+    button_list.append(InlineKeyboardButton('split', callback_data = 'split' + " {} {}".format(chosen_book_id, chosen_page_no)))
+    button_list.append(InlineKeyboardButton('all', callback_data = 'all' + " {} {}".format(chosen_book_id, chosen_page_no)))
+    reply_markup = InlineKeyboardMarkup(build_menu(button_list, columns = 3))
+    await update.message.reply_text(
+        "Wybierz zadanie",
+        reply_markup = reply_markup
+    )
+    logger.info("User %s (@%s, id: %s) - waiting for button response.", user.first_name, user.username, user.id)
+    return SELECT_BUTTONF
+
+"""AIO command to send odrabiamy link, then sends out the solution"""
 @restricted
 async def start_get(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Encourages to send odrabiamy link, waits 60 seconds for it, then - times out (timeout specified in main())"""
     user = update.message.from_user
     logger.info("User %s (@%s, id: %s) started the /GET the conversation", user.first_name, user.username, user.id)
 
     if 'odrabiamy.pl' in update.message.text:
-        """Parses list of exercises from specified page and displays button options for them"""
         global chosen_book_name, chosen_book_kind, chosen_book_authors, chosen_book_released, chosen_book_publisher
         try:
             sent_url = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
@@ -289,6 +382,7 @@ async def start_get(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except IndexError:
             await update.message.reply_text('Niepoprawny adres URL')
             logger.info("User %s (@%s, id: %s) typed wrong link in /GET", user.first_name, user.username, user.id)
+        await update.message.reply_text('Pobieranie danych...')
 
         clean_data = get_from_db(str(chosen_book_id), str(chosen_page_no))[0]
         if clean_data == "":
@@ -301,8 +395,13 @@ async def start_get(update: Update, context: ContextTypes.DEFAULT_TYPE):
             request_or_local = 'L'
         clean_data = clean_data.replace('\\\'', '\'')
         soupFromFile = BeautifulSoup(clean_data, 'html.parser')
+
+
+        if chosen_exercise_id != 'null':
+            getFileContents = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{chosen_book_name}<br>{chosen_book_kind}, {chosen_book_authors}, {chosen_book_released}, {chosen_book_publisher}</h1>' + str(soupFromFile.find('div', class_=f'exercise-{chosen_exercise_id}').extract())
+        else:
+            getFileContents = str(soupFromFile)
         
-        getFileContents = str(soupFromFile)
         logger.info("User %s (@%s, id: %s) - capturing (all).", user.first_name, user.username, user.id)
         getFileContents = getFileContents.replace('\'\'', "\'")
         page_html_clean = str(getFileContents.replace('\\xa0', '\\xc2\\xa0').encode("utf-8"))\
@@ -312,8 +411,8 @@ async def start_get(update: Update, context: ContextTypes.DEFAULT_TYPE):
             .lstrip('b\'').rstrip('\'')
 
         async def split_exercises_run(playwright):
-            chromium = playwright.firefox
-            browser = await chromium.launch()
+            playwright_firefox = playwright.firefox
+            browser = await playwright_firefox.launch()
             page = await browser.new_page()
             await page.set_content('{}'.format(page_html_clean))
             await page.wait_for_load_state('domcontentloaded')
@@ -340,8 +439,97 @@ async def start_get(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info("User %s (@%s, id: %s) typed wrong link in /GET", user.first_name, user.username, user.id)
 
 
+"""AIO command to send odrabiamy link, then sends out the solution - force download from odrabiamy"""
+@restricted
+async def start_get_force(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    logger.info("User %s (@%s, id: %s) started the /GETF the conversation", user.first_name, user.username, user.id)
+
+    if 'odrabiamy.pl' in update.message.text:
+        global chosen_book_name, chosen_book_kind, chosen_book_authors, chosen_book_released, chosen_book_publisher
+        try:
+            sent_url = update.message.text.split('odrabiamy.pl')[1].split(' ')[0].split('/')
+            chosen_book_id = sent_url[2].split('-')[1]
+            get_book = requests.get(url=f'https://odrabiamy.pl/api/v3/books/{chosen_book_id}').content.decode('utf-8')
+            if json.loads(get_book).get('name') == None:
+                await update.message.reply_text('Nie ma takiej książki, spróbuj ponownie')
+                logger.info("User %s (@%s, id: %s) typed wrong book in /GETF", user.first_name, user.username, user.id)
+            chosen_book_name = str(json.loads(get_book).get('name'))
+            chosen_book_kind = str(json.loads(get_book).get('kind'))
+            chosen_book_authors = str(json.loads(get_book).get('authors'))
+            chosen_book_released = str(json.loads(get_book).get('released'))
+            chosen_book_publisher = str(json.loads(get_book).get('publisher'))
+            try:
+                chosen_page_no = sent_url[3].split('-')[1]
+            except IndexError:
+                chosen_page_no = json.loads(get_book)['pages'][0]
+            if int(chosen_page_no) in json.loads(get_book)['pages']:
+                pass
+            else:
+                await update.message.reply_text('Nie ma takiej strony, spróbuj ponownie')
+                await update.message.reply_text("Wklej link do odrabiamy (czekam 60 sekund)")
+                logger.info("User %s (@%s, id: %s) typed wrong page in /GETF", user.first_name, user.username, user.id)
+            try:
+                chosen_exercise_id = sent_url[4].split('-')[1]
+            except IndexError:
+                chosen_exercise_id = 'null'
+        except IndexError:
+            await update.message.reply_text('Niepoprawny adres URL')
+            logger.info("User %s (@%s, id: %s) typed wrong link in /GETF", user.first_name, user.username, user.id)
+        await update.message.reply_text('Pobieranie danych...')
+
+        del_from_db(str(chosen_book_id), str(chosen_page_no))
+        logger.info("User %s (@%s, id: %s) - requesting download from odrabiamy.", user.first_name, user.username, user.id)
+        page_download(str(chosen_book_id), str(chosen_page_no))
+        clean_data = get_from_db(str(chosen_book_id), str(chosen_page_no))[0]
+        request_or_local = 'R'
+        clean_data = clean_data.replace('\\\'', '\'')
+        soupFromFile = BeautifulSoup(clean_data, 'html.parser')
+
+
+        if chosen_exercise_id != 'null':
+            getFileContents = f'<head><meta charset="UTF-8"></head><h1 style=\'font-weight:700;color:#200;font-family:\"Arial\",sans-serif;\'>{chosen_book_name}<br>{chosen_book_kind}, {chosen_book_authors}, {chosen_book_released}, {chosen_book_publisher}</h1>' + str(soupFromFile.find('div', class_=f'exercise-{chosen_exercise_id}').extract())
+        else:
+            getFileContents = str(soupFromFile)
+        
+        logger.info("User %s (@%s, id: %s) - capturing (all).", user.first_name, user.username, user.id)
+        getFileContents = getFileContents.replace('\'\'', "\'")
+        page_html_clean = str(getFileContents.replace('\\xa0', '\\xc2\\xa0').encode("utf-8"))\
+            .replace('\\\\', '\\')\
+            .encode().decode('unicode-escape')\
+            .encode('raw-unicode-escape').decode()\
+            .lstrip('b\'').rstrip('\'')
+
+        async def split_exercises_run(playwright):
+            playwright_firefox = playwright.firefox
+            browser = await playwright_firefox.launch()
+            page = await browser.new_page()
+            await page.set_content('{}'.format(page_html_clean))
+            await page.wait_for_load_state('domcontentloaded')
+            finalPngOutput = await page.screenshot(full_page=True)
+            imgdata = Image.open(BytesIO(finalPngOutput)).size[1]
+            await browser.close()
+            return finalPngOutput, imgdata
+        async with async_playwright() as playwright:
+            playwright_output = await split_exercises_run(playwright)
+        finalPngOutput = playwright_output[0]
+        imgheight = playwright_output[1]
+        if imgheight > 800: document_or_picture = 'd'
+        else: document_or_picture = 'p'
+        if document_or_picture == 'd':
+            await context.bot.send_document(update.effective_chat.id,
+                BytesIO(finalPngOutput),filename=f"{request_or_local}_GETF_{chosen_book_name}_Strona_{chosen_page_no}.png")
+        elif document_or_picture == 'p':
+            await context.bot.send_photo(update.effective_chat.id,
+                BytesIO(finalPngOutput),filename=f"{request_or_local}_GETF_{chosen_book_name}_Strona_{chosen_page_no}.png")
+
+            logger.info("User %s (@%s, id: %s) - sent (/GETF).", user.first_name, user.username, user.id)
+    else:
+        await update.message.reply_text('Składnia: /getf <URL do odrabiamy>')
+        logger.info("User %s (@%s, id: %s) typed wrong link in /GETF", user.first_name, user.username, user.id)
+
+"""Parses the CallbackQuery and updates the message text."""
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Parses the CallbackQuery and updates the message text."""
     user = update.callback_query.from_user
     query = update.callback_query
     await query.answer()
@@ -387,8 +575,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                             .lstrip('b\'').rstrip('\'')
 
         async def split_exercises_run(playwright):
-            chromium = playwright.firefox
-            browser = await chromium.launch()
+            playwright_firefox = playwright.firefox
+            browser = await playwright_firefox.launch()
             page = await browser.new_page()
             await page.set_content('{}'.format(page_html_clean))
             await page.wait_for_load_state('domcontentloaded')
@@ -430,8 +618,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             
             logger.info("User %s (@%s, id: %s) - capturing (split).", user.first_name, user.username, user.id)
             async def split_exercises_run(playwright):
-                chromium = playwright.firefox
-                browser = await chromium.launch()
+                playwright_firefox = playwright.firefox
+                browser = await playwright_firefox.launch()
                 page = await browser.new_page()
                 await page.set_content('{}'.format(page_html_clean))
                 await page.wait_for_load_state('domcontentloaded')
@@ -456,9 +644,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 
+"""Displays info on how to use the bot."""
 @restricted
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays info on how to use the bot."""
     user = update.message.from_user
     logger.info("User %s (@%s, id: %s) requested help menu.", user.first_name, user.username, user.id)
     await update.message.reply_text("Pomoc odrabiamy-telegram\n\n/start - bot poprosi o link, i wyświeli listę zadań z danej strony, oraz split i all. gdy zostanie wybrany nr zadania, bot wysle tylko to zadanie. gdy zostanie wybrany split, bot rozdzieli wszystkie zadania z tej strony na kazdy plik. gdy zostanie wybrany all, bot wysle wszystkie zadania z tej strony w jednym pliku.\n\n/get - składnia get to: /get <URL do odrabiamy>, bot wysle albo cala strone, albo poszczegolne zadanie w zaleznosci czy link prowadzi do strony, czy do poszczegolnego zadania.")
@@ -474,21 +662,22 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     return ConversationHandler.END
 
-# refresh odrabiamy token
+"""Refresh odrabiamy token"""
 async def refresh_token(update: Update) -> None:
     global odrabiamy_token
     odrabiamy_token = get_odrabiamy_token(ODRABIAMY_LOGIN, ODRABIAMY_PASS)
     logger.info("Refreshed odrabiamy token.")
 
 
+"""Run the bot."""
 def main() -> None:
-    """Run the bot."""
-    # create the Application and pass it your bot's token.
-
+    # initialize application token and commands
     async def post_init(application: Application) -> None:
         commands = [
             ("start", "Start"),
-            ("get", "Start (get - instant url)"),
+            ("startf", "Start (force)"),
+            ("get", "Start (get - aio)"),
+            ("getf", "Start (get - aio, force)"),
             ("pomoc", "Pomoc"),
             ("help", "Pomoc"),
             ("anuluj", "Anuluj"),
@@ -498,7 +687,7 @@ def main() -> None:
         await application.bot.set_my_commands(commands)
     application = Application.builder().token(getenv("TG_TOKEN")).post_init(post_init).build()
 
-    # refresh odrabiamy token every X seconds, 1728000 seconds (20 days) by default
+    # refresh odrabiamy token (every 1728000 seconds/20 days by default)
     application.job_queue.run_repeating(callback=refresh_token, interval=1728000, first=0.0)
 
     conv_handler = ConversationHandler(
@@ -516,10 +705,27 @@ def main() -> None:
     )
     conv_handler.check_update(update=Update)
 
+    conv_handler_force = ConversationHandler(
+        entry_points = [CommandHandler("startf", start_force)],
+        states = {
+            TYPE_LINKF: [CommandHandler("cancel", cancel), CommandHandler("anuluj", cancel), CommandHandler("stop", cancel), MessageHandler(filters.TEXT, link_force),],
+            SELECT_BUTTONF: [CallbackQueryHandler(button), CommandHandler("cancel", cancel), CommandHandler("anuluj", cancel), CommandHandler("stop", cancel), MessageHandler(filters.ALL, 0),],
+        },
+        fallbacks = [
+            CommandHandler("cancel", cancel),
+            CommandHandler("anuluj", cancel),
+            CommandHandler("stop", cancel),
+        ],
+        conversation_timeout = 60, allow_reentry = True,
+    )
+    conv_handler_force.check_update(update=Update)
+
     application.add_handler(conv_handler)
+    application.add_handler(conv_handler_force)
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("pomoc", help_command))
     application.add_handler(CommandHandler("get", start_get))
+    application.add_handler(CommandHandler("getf", start_get_force))
 
     # run the bot until the user presses Ctrl-C
     application.run_polling()
