@@ -39,18 +39,18 @@ To do that, run: `docker compose down` and `docker compose up -d --build`
 
 ## Management (whitelist)
 If you try to interact with the bot, it will spit out a message about contacting the administrator (in polish for end-users friendliness, odrabiamy.pl is a polish service afterall) also providing user's ID. the user has to give you this ID to get access to your instance of this bot - then insert it into `whitelist.txt` file located in the repository's folder - you can do that on the fly (you don't have to restart the bot every time you add a new user to the whitelist)<br>Lines with # at the start qualify as comments, IDs should be put in their own line without any unwanted characters besides numbers of course (duh), spaces etc...<h3 style="margin:0;padding:0;">Example `whitelist.txt`:</h3>
-    ```
-    # A comment, for example who does this ID below belong to
-    1234567890
-    # John Smith
-    9876543215
-    # Max Deidre
-    6565656566
-    # [etc...]
-    4323424324
-    # idk a psychopath or sth
-    9090678467
-    ```
+```
+# A comment, for example who does this ID below belong to
+1234567890
+# John Smith
+9876543215
+# Max Deidre
+6565656566
+# [etc...]
+4323424324
+# idk a psychopath or sth
+9090678467
+```
 
 ## Usage
 People have 2 options (technically 4) to interact with the bot
