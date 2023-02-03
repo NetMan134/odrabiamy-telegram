@@ -1,73 +1,78 @@
 # odrabiamy-telegram
-odrabiamy-telegram is a Telegram bot client for odrabiamy.pl
+odrabiamy-telegram is a Telegram bot client for Odrabiamy.pl
 
-## Usage (python bare-metal) (postgresql docker compose)
-<!-- 1. Setup a PostgreSQL server: -->
-<!-- 1. Use PostgreSQL docker compose (linux)<br> -->
-1. cd into postgresql-docker,
-2. modify docker-compose.yml to satisfy your needs (remember the changes for later!):
-    - change `POSTGRES_USER` to your choice,
-    - change `POSTGRES_PASSWORD` to your choice,
-    - change `POSTGRES_DB` to your choice,
-    - change `5432:5432` to `<PORT>:5432`, where `<PORT>` is your choice (you can leave it as default).
-3. run `docker-compose up -d` or `docker compose up -d` in that directory,
-4. assuming the previous command completed without errors, acquire `psql` executable most likely from your package manager,
-5. run `PGPASSWORD=<POSTGRES_PASSWORD> psql -h "localhost" -U "<POSTGRES_USER>" -d "<POSTGRES_DB>" -c 'CREATE TABLE IF NOT EXISTS <POSTGRES_TABLE> (book_id int not null, page_no int not null, exercises text not null, content text not null);'` and replace angle brackets with their values of your choice, (save your chosen `<POSTGRES_TABLE>` for later),
-6. cd into main folder of the repository,
-7. edit run.sh to satisfy your needs:
-    - change `ODRABIAMY_LOGIN` to your odrabiamy account email,
-    - change `ODRABIAMY_PASS` to your odrabiamy account password,
-    - change `TG_TOKEN` to your Telegram token acquired from [BotFather](https://t.me/@BotFather "BotFather"),
-    - leave `DB_ADDRESS` as `localhost`,
-    - change `DB_USER` to your chosen change previously,
-    - change `DB_PASS` to your chosen change previously,
-    - change `DB_NAME` to your chosen change previously,
-    - change `DB_TABLE` to your chosen change previosly,
-    - change `DB_PORT` to your chosen change previosly.
-8. run:
+## Installation (fully dockerized)
+1. Clone this repository (`git clone https://github.com/NetMan134/odrabiamy-telegram`).
+2. Make sure you have docker and docker compose plugin installed on your system.
+3. Modify variables.env to your values:
+    - `ODRABIAMY_LOGIN` Odrabiamy.pl email address,
+    - `ODRABIAMY_PASS` Odrabiamy.pl password, 
+    - `TG_TOKEN` Telegram bot token,
+    - better leave PostgreSQL values as default unless you know what you're doing.
+5. Run `docker compose up -d` in that directory.
+
+### Updates
+1. Stop the instance by running `docker compose down`.
+2. Run `git pull` to acquire new commits.
+3. Run `docker compose up -d --build`.
+
+### Troubleshooting
+If the containers behave weirdly, try rebuilding them.<br>
+To do that, run: `docker compose down` and `docker compose up -d --build`.
+
+## Installation (bare-metal) 
+1. Make sure you have Python 3 installed on your system (for best compatibility, use 3.11.1).
+2. Set up a PostgreSQL server with a database and ability to read/write, etc. (you can create a docker container with a postgres image), and run a sql instruction from `table.sql` file.
+3. Modify `./run.sh` to your values:
+    - `ODRABIAMY_LOGIN` Odrabiamy.pl email address,
+    - `ODRABIAMY_PASS` Odrabiamy.pl password, 
+    - `TG_TOKEN` Telegram bot token,
+    - `DB_ADDRESS` PostgreSQL address,
+    - `POSTGRES_USER` PostgreSQL user,
+    - `POSTGRES_PASSWORD` PostgreSQL password,
+    - `POSTGRES_DB` PostgreSQL database name,
+    - `DB_TABLE` PostgreSQL table name (by default in `table.sql` it's specified as "baza"),
+    - `DB_PORT` PostgreSQL port.
+5. Run:
     - `python3 -m venv odrabiamy-venv`
     - `source odrabiamy-venv/bin/activate`
     - `pip install -r requirements.txt`
-    - `pip install python-telegram-bot[job-queue]`
-    - `playwright install`
+    - `pip install "python-telegram-bot[job-queue]"`
+    - `playwright install-deps` (only if using a debian-based distro with apt)
+    - `playwright install firefox`
     - `chmod a+x run.sh`
-9. launch run.sh (`./run.sh`) - if you want to run it again, make sure odrabiamy-venv is loaded, if you're not sure or it isn't initialized, run `source odrabiamy-venv/bin/activate` and then launch run.sh
-10. if you try to interact with the bot, it will spit out a message about contacting the administrator (in polish for end-users friendliness) also providing user's ID - the user has to message you in order for you to acquire this ID (of course from users that you want to have access to your instance of this bot) - then insert it into `whitelist.txt` - you can do that on the fly, in other words you don't have to restart the bot every time you add a new user to the whitelist<br>Lines with # at the start qualify as comments, IDs should be put in their own line without any unwanted characters besides numbers of course (duh), spaces etc...<h3 style="margin:0;padding:0;">Example `whitelist.txt`:</h3>
-    ```
-    # A comment, for example who does this ID below belong to
-    1234567890
-    # John Smith
-    9876543215
-    # Max Deidre
-    6565656566
-    # [etc...]
-    4323424324
-    # idk a psychopath or sth
-    9090678467
-    ```
 
+## Launching (docker)
+1. To start the bot, cd into the bot directory and run `docker compose up -d` in that directory.
+2. To stop the bot, cd into the bot directory and run `docker compose down` in that directory.
 
-    <!-- !["postgresql table config"](https://raw.githubusercontent.com/NetMan134/odrabiamy-telegram/master/postgresql-table.png "postgresql table config")<br> -->
-<!-- 3. Set environment variables:
-    * `ODRABIAMY_LOGIN`,
-    * `ODRABIAMY_PASS`,
-    * `TELEGRAM_BOT_TOKEN`,
-    * `DB_ADDRESS`,
-    * `DB_USER`,
-    * `DB_PASS`,
-    * `DB_NAME`
-4. Run the script! (`python odrabiamy-bot-telegram.py`) -->
-<!--
-## Usage with docker-compose (not recommended FOR NOW, need to check this later)
-1. Edit docker-compose.yml, set environment variables:
-    * `ODRABIAMY_LOGIN`,
-    * `ODRABIAMY_PASS`,
-    * `TELEGRAM_BOT_TOKEN`,
-    * `DB_ADDRESS`,
-    * `DB_USER`,
-    * `DB_PASS`,
-    * `DB_NAME`
-2. Run docker-compose `docker-compose up` (need to check this later) -->
+## Launching (bare-metal)
+1. To start the bot, cd into the bot directory and run `./run.sh` in that directory.
+2. To stop the bot, just press Ctrl-C until you're back at your shell prompt.
+
+## Management (whitelist)
+If you try to interact with the bot, it will reply with a message about contacting the administrator. also providing user's ID. the user has to give you this ID to get access to your instance of this bot - then insert it into `whitelist.txt` file located in the repository's folder - you can do that on the fly (you don't have to restart the bot every time you add a new user to the whitelist)<br>Lines with # at the start qualify as comments, IDs should be put in their own line without any unwanted characters besides numbers of course (duh), spaces etc...<h3 style="margin:0;padding:0;">Example `whitelist.txt`:</h3>
+```
+# A comment for example:
+# ID below belongs to XYZ
+1234567890
+# John Smith
+9876543215
+# Elon Musk
+6565656566
+# Jeff Bezos
+4323424324
+# Bill Gates
+9090678467
+```
+
+## Usage
+Because Odrabiamy.pl is a polish service, this bot replies in Polish.<br>
+People have 2 options (technically 4) to interact with the bot:
+1. <strong>/start</strong> - bot will ask for a link, and will show a button list of: exercises from the chosen page, and beside them 2 options: "split" and "all"; when the exercise number is chosen, bot will send only the specified exercise; when "split" will be chosen, bot will seperate all exercises for every individual image; when "all" will be chosen, bot will send all exercises from this page in one image.<br>
+<strong>/startf</strong> - basically the same as /start but forces the bot to download solutions directly from odrabiamy, rather than from a local database cache (you can use this for example if the image contents are corrupted).
+2. <strong>/get</strong> - the get syntax is: /get `<URL to odrabiamy>`, and: if the link redirects to the whole page, bot will send the whole page; if the link redirects to a specific exercise, bot will send a specific exercise.<br>
+<strong>/getf</strong> - basically the same as /start but forces the bot to download solutions directly from odrabiamy, rather than from a local database cache (you can use this for example if the image contents are corrupted).
 
 ## Limit
 Odrabiamy.pl has a limit for browsing solutions to exercises, it's 60 exercises a day, and it resets at 12:00 AM every day.
@@ -82,10 +87,10 @@ If you want to continue with acquiring data via this bot, click "Got it" and con
 
 ## To-Do list:
 - [X] use postgresql
-- [ ] full dockerization
+- [X] full dockerization
+- [ ] provide a user-friendly first-time run shell script (for bare-metal users)
 - [ ] code clean-up
 - [ ] more secure way of storing secrets
-- [ ] provide a user-friendly first-time run shell script
 
 ## Warning
 Using odrabiamy.pl API with external programs, scripts is allowed only with administration consent.
