@@ -1,6 +1,11 @@
 # odrabiamy-telegram
 odrabiamy-telegram is a Telegram bot client for odrabiamy.pl
 
+# IMPORTANT!
+Recently I made this bot compatible with docker, check out the [netman-docker](https://github.com/NetMan134/odrabiamy-telegram/tree/netman-docker "netman-docker") branch.
+The reason I did not bring it over to master is that I'm still polishing some stuff and I don't know if it's ready for "master".
+But you can follow the instructions on docker, and feedback is very much appreciated! (You can and will be able to still use the old fashion bare-metal way if you want!)
+
 ## Usage (python bare-metal) (postgresql docker compose)
 <!-- 1. Setup a PostgreSQL server: -->
 <!-- 1. Use PostgreSQL docker compose (linux)<br> -->
