@@ -2,9 +2,9 @@ ODRABIAMY_LOGIN=mail@example.com \
 ODRABIAMY_PASS=qwerty12345 \
 TG_TOKEN=54321:QWERTYABCDEFGzxcv123bnm \
 DB_ADDRESS=localhost \
-DB_USER=user \
-DB_PASS=qwerty12345 \
-DB_NAME=odrabiamy \
+POSTGRES_USER=user \
+POSTGRES_PASSWORD=qwerty12345 \
+POSTGRES_DB=odrabiamy \
 DB_TABLE=baza \
 DB_PORT=5432 \
 python3 ./odrabiamy-bot-telegram.py
