@@ -9,7 +9,7 @@ services:
             - ./db:/var/lib/postgresql/data
             - ./table.sql:/docker-entrypoint-initdb.d/create_tables.sql
         expose:
-            - "5432"
+            - '5432'
     odrabiamy-app:
         build: ./
         env_file:
