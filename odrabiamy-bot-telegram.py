@@ -134,7 +134,7 @@ class ThreadWithReturnValue(threading.Thread):
 """Download page solution and insert it into PostgreSQL database"""
 def page_download(downloaded_book_id, downloaded_page_no):
     page_data = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/premium/{downloaded_page_no}/{downloaded_book_id}',
-        headers={'user-agent':'new_user_agent-huawei-144','Authorization': f'Bearer {odrabiamy_token}'})\
+        headers={'user-agent':'new_user_agent-android-3.3.12','Authorization': f'Bearer {odrabiamy_token}'})\
         .content.decode('utf-8')).get('data')
     downloaded_book_name = page_data[0]['book']['name']
     sum_of_exercises = 0; active_exercise = 0
@@ -229,7 +229,7 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if db_exercises_list == "":
         logger.info("User %s (@%s, id: %s) - downloading list of exercises.", user.first_name, user.username, user.id)
         page_no_premium = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/{chosen_page_no}/{chosen_book_id}',
-            headers={'user-agent':'new_user_agent-huawei-144'})\
+            headers={'user-agent':'new_user_agent-android-3.3.12'})\
             .content.decode('utf-8')).get('data')
         list_of_exercises = []
         list_of_exercise_ids = []
@@ -315,7 +315,7 @@ async def link_force(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     logger.info("User %s (@%s, id: %s) - downloading list of exercises (force).", user.first_name, user.username, user.id)
     page_no_premium = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/{chosen_page_no}/{chosen_book_id}',
-        headers={'user-agent':'new_user_agent-huawei-144'})\
+        headers={'user-agent':'new_user_agent-android-3.3.12'})\
         .content.decode('utf-8')).get('data')
     list_of_exercises = []
     list_of_exercise_ids = []
@@ -601,7 +601,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else: logger.info("User %s (@%s, id: %s) - sent (exercise_id: %s).", user.first_name, user.username, user.id, chosen_exercise_id)
     else:
         ex_p_data = json.loads(requests.get(url=f'https://odrabiamy.pl/api/v2/exercises/page/{chosen_page_no}/{chosen_book_id}',
-            headers={'user-agent':'new_user_agent-huawei-144'})\
+            headers={'user-agent':'new_user_agent-android-3.3.12'})\
             .content.decode('utf-8')).get('data')
         list_of_exercise_ids = []
         for exercise in ex_p_data:
