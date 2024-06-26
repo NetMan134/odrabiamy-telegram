@@ -1,8 +1,8 @@
 # odrabiamy-telegram
 odrabiamy-telegram is a Telegram bot client for Odrabiamy.pl
 
-# Update
-The token can't seem to be retrieved anymore, so this projects is on hold...
+# IMPORTANT UPDATE
+PROJECT NOT MAINTAINED AND NOT WORKING (though it could be modified to be, I no longer have interest in continuing)
 
 ## Installation (fully dockerized)
 1. Clone this repository (`git clone https://github.com/NetMan134/odrabiamy-telegram`).
